@@ -295,7 +295,7 @@ RADCLIENT *client_listener_find(rad_listen_t *listener,
 	 *	and create the RADCLIENT structure from that.
 	 */
 	RDEBUG("server %s {", request->server);
-
+    rad_decode(request->packet, NULL,NULL);
 	rcode = process_authorize(0, request);
 
 	RDEBUG("} # server %s", request->server);
@@ -687,7 +687,7 @@ static int tls_sni_callback(SSL *ssl, UNUSED int *al, void *arg)
 	 *	one.
 	 */
 	if (r) (void) SSL_set_SSL_CTX(ssl, r->ctx);
-		
+
 	/*
 	 *	Set an attribute saying which server has been selected.
 	 */

@@ -121,9 +121,8 @@ static int rlm_rest_perform(rlm_rest_t *instance, rlm_rest_section_t *section, v
 	 *  HTTP body data into a single contiguous buffer.
 	 */
 	ret = rest_request_perform(instance, section, request, handle);
-	if (ret < 0) return -1;
 
-	return 0;
+	return ret;
 }
 
 static void rlm_rest_cleanup(rlm_rest_t *instance, rlm_rest_section_t *section, void *handle)
@@ -296,7 +295,7 @@ static ssize_t rest_xlat(void *instance, REQUEST *request,
 	 *  HTTP body data into a single contiguous buffer.
 	 */
 	ret = rest_request_perform(instance, &section, request, handle);
-	if (ret < 0) {
+	if (ret != CURLE_OK) {
 		outlen = -1;
 		goto finish;
 	}
@@ -373,7 +372,12 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authorize(void *instance, REQUEST *reque
 	if (!handle) return RLM_MODULE_FAIL;
 
 	ret = rlm_rest_perform(instance, section, handle, request, NULL, NULL);
-	if (ret < 0) {
+	if (ret != CURLE_OK) {
+		if (ret == CURLE_COULDNT_CONNECT)
+		    WARN("rest:mod_authorize call could not connect");
+		else if (ret == CURLE_OPERATION_TIMEDOUT)
+		    WARN("rest:mod_authorize call timeout");
+
 		rcode = RLM_MODULE_FAIL;
 		goto finish;
 	}
@@ -478,7 +482,11 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 	if (!handle) return RLM_MODULE_FAIL;
 
 	ret = rlm_rest_perform(instance, section, handle, request, username->vp_strvalue, password->vp_strvalue);
-	if (ret < 0) {
+	if (ret != CURLE_OK) {
+		if (ret == CURLE_COULDNT_CONNECT)
+            WARN("rest:mod_authenticate call could not connect");
+        else if (ret == CURLE_OPERATION_TIMEDOUT)
+            WARN("rest:mod_authenticate call timeout");
 		rcode = RLM_MODULE_FAIL;
 		goto finish;
 	}
@@ -563,29 +571,65 @@ static rlm_rcode_t CC_HINT(nonnull) mod_common(rlm_rest_t *inst, REQUEST *reques
 	if (!handle) return RLM_MODULE_FAIL;
 
 	ret = rlm_rest_perform(inst, section, handle, request, NULL, NULL);
-	if (ret < 0) {
+	if (ret != CURLE_OK) {
+		if (ret == CURLE_COULDNT_CONNECT)
+            WARN("rest:mod_common call could not connect");
+        else if (ret == CURLE_OPERATION_TIMEDOUT)
+            WARN("rest:mod_common call timeout");
 		rcode = RLM_MODULE_FAIL;
 		goto finish;
 	}
 
 	hcode = rest_get_handle_code(handle);
-	if (hcode >= 500) {
+	switch (hcode) {
+	case 404:
+	case 410:
+		rcode = RLM_MODULE_NOTFOUND;
+		break;
+
+	case 403:
+		rcode = RLM_MODULE_USERLOCK;
+		break;
+
+	case 401:
+		/*
+		 *	Attempt to parse content if there was any.
+		 */
+		ret = rest_response_decode(inst, section, request, handle);
+		if (ret < 0) {
 		rcode = RLM_MODULE_FAIL;
-	} else if (hcode == 204) {
+			break;
+		}
+
+		rcode = RLM_MODULE_REJECT;
+		break;
+
+	case 204:
 		rcode = RLM_MODULE_OK;
-	} else if ((hcode >= 200) && (hcode < 300)) {
+		break;
+
+	default:
+		/*
+		 *	Attempt to parse content if there was any.
+		 */
+		if ((hcode >= 200) && (hcode < 300)) {
 		ret = rest_response_decode(inst, section, request, handle);
 		if (ret < 0) 	   rcode = RLM_MODULE_FAIL;
 		else if (ret == 0) rcode = RLM_MODULE_OK;
 		else		   rcode = RLM_MODULE_UPDATED;
-	} else {
+			break;
+		} else if (hcode < 500) {
 		rcode = RLM_MODULE_INVALID;
+		} else {
+			rcode = RLM_MODULE_FAIL;
+		}
 	}
 
 finish:
 	switch (rcode) {
 	case RLM_MODULE_INVALID:
 	case RLM_MODULE_FAIL:
+	case RLM_MODULE_USERLOCK:
 		rest_response_error(request, handle);
 		break;
 
@@ -676,7 +720,11 @@ static rlm_rcode_t CC_HINT(nonnull) mod_recv_coa(void *instance, REQUEST *reques
 	if (!handle) return RLM_MODULE_FAIL;
 
 	ret = rlm_rest_perform(instance, section, handle, request, NULL, NULL);
-	if (ret < 0) {
+	if (ret != CURLE_OK) {
+		if (ret == CURLE_COULDNT_CONNECT)
+            WARN("rest:mod_recv_coa call could not connect");
+        else if (ret == CURLE_OPERATION_TIMEDOUT)
+            WARN("rest:mod_recv_coa call timeout");
 		rcode = RLM_MODULE_FAIL;
 		goto finish;
 	}

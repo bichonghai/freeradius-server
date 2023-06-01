@@ -549,39 +549,45 @@ size_t vp_prints_value_json(char *out, size_t outlen, VALUE_PAIR const *vp, bool
 				*out++ = *q;
 				freespace--;
 			} else {
-				*out++ = '\\';
-				freespace--;
 
 				switch (*q) {
 				case '\b':
+					*out++ = '\\';
 					*out++ = 'b';
-					freespace--;
+					freespace -= 2;
 					break;
 
 				case '\f':
+					*out++ = '\\';
 					*out++ = 'f';
-					freespace--;
+					freespace -= 2;
 					break;
 
 				case '\n':
+					*out++ = '\\';
 					*out++ = 'n';
-					freespace--;
+					freespace -= 2;
 					break;
 
 				case '\r':
+					*out++ = '\\';
 					*out++ = 'r';
-					freespace--;
+					freespace -= 2;
 					break;
 
 				case '\t':
+					*out++ = '\\';
 					*out++ = 't';
-					freespace--;
+					freespace -= 2;
 					break;
 				default:
-					len = snprintf(out, freespace, "u%04X", (uint8_t) *q);
-					if (is_truncated(len, freespace)) return (outlen - freespace) + len;
-					out += len;
-					freespace -= len;
+					memcpy(out, q, 1);
+					freespace--;
+					out++;
+					//len = snprintf(out, freespace, "u%04X", (uint8_t) *q);
+					//if (is_truncated(len, freespace)) return (outlen - freespace) + len;
+					//out += len;
+					//freespace -= len;
 				}
 			}
 		}

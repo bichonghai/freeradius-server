@@ -2404,7 +2404,7 @@ int rest_request_perform(UNUSED rlm_rest_t *instance, UNUSED rlm_rest_section_t 
 	if (ret != CURLE_OK) {
 		REDEBUG("Request failed: %i - %s", ret, curl_easy_strerror(ret));
 
-		return -1;
+		// return -1;
 	}
 
 	/*
@@ -2415,7 +2415,8 @@ int rest_request_perform(UNUSED rlm_rest_t *instance, UNUSED rlm_rest_section_t 
 
 	RDEBUG2("Adding reply:REST-HTTP-Status-Code = \"%d\"", vp->vp_integer);
 
-	return 0;
+	//return 0;
+	return ret;
 }
 
 /** Sends the response to the correct decode function.
